@@ -43,7 +43,7 @@ class RegisterController extends Controller
      * Registration
      * Register a new user to the system.
      * @bodyParam name string required The name of the user. Example: Kevin Durant
-     * @bodyParam email string required The email of the user. Example kd35@nets.com
+     * @bodyParam email string required The email of the user. Example: kd35@nets.com
      * @bodyParam password string required The password of user. Must be over 6 characters. Example: secret1
      * @response 201 {"message": "User has been created."}
      * @response 422 {"message": ":attribute field is required"}
