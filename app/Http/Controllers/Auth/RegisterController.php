@@ -2,72 +2,68 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Events\UserHasRegistered;
 use App\Http\Controllers\Controller;
-use App\Providers\RouteServiceProvider;
-use App\User;
-use Illuminate\Foundation\Auth\RegistersUsers;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
+use App\Repositories\UserRepository;
+use Illuminate\Contracts\Hashing\Hasher;
+use Illuminate\Contracts\Routing\ResponseFactory;
+use Illuminate\Events\Dispatcher;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * @group Auth
+ */
 class RegisterController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Register Controller
-    |--------------------------------------------------------------------------
-    |
-    | This controller handles the registration of new users as well as their
-    | validation and creation. By default this controller uses a trait to
-    | provide this functionality without requiring any additional code.
-    |
-    */
-
-    use RegistersUsers;
+    /**
+     * @var Hasher
+     */
+    private $hash;
 
     /**
-     * Where to redirect users after registration.
-     *
-     * @var string
+     * @var Dispatcher
      */
-    protected $redirectTo = RouteServiceProvider::HOME;
+    private $dispatcher;
 
     /**
-     * Create a new controller instance.
-     *
-     * @return void
+     * @var UserRepository
      */
-    public function __construct()
+    private $userRepository;
+
+    public function __construct(Hasher $hash, Dispatcher $dispatcher, UserRepository $userRepository)
     {
-        $this->middleware('guest');
+        $this->hash = $hash;
+        $this->dispatcher = $dispatcher;
+        $this->userRepository = $userRepository;
     }
 
-    /**
-     * Get a validator for an incoming registration request.
-     *
-     * @param  array  $data
-     * @return \Illuminate\Contracts\Validation\Validator
-     */
-    protected function validator(array $data)
-    {
-        return Validator::make($data, [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ]);
-    }
 
     /**
-     * Create a new user instance after a valid registration.
+     * Registration
+     * Register a new user to the system.
+     * @bodyParam name string required The name of the user. Example: Kevin Durant
+     * @bodyParam email string required The email of the user. Example kd35@nets.com
+     * @bodyParam password string required The password of user. Must be over 6 characters. Example: secret1
+     * @response 201 {"message": "User has been created."}
+     * @response 422 {"message": ":attribute field is required"}
      *
-     * @param  array  $data
-     * @return \App\User
+     * @param Request $request
+     * @return ResponseFactory|\Illuminate\Http\Response
      */
-    protected function create(array $data)
+    public function register(Request $request)
     {
-        return User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
+        $request->validate([
+            'name' => ['required', 'string'],
+            'email' => ['required', 'email', 'unique:users,email'],
+            'password' => ['required', 'min:6']
         ]);
+
+        $data = $request->all();
+        $data['password'] = $this->hash->make($request->password);
+        $user = $this->userRepository->create($data);
+        $this->dispatcher->dispatch(new UserHasRegistered($user));
+
+        return response(['message' => 'User has been created.'], Response::HTTP_CREATED);
     }
 }
